@@ -1,6 +1,4 @@
 spring:
-  application:
-    name: CisHackIt
 
   jpa:
     hibernate:
