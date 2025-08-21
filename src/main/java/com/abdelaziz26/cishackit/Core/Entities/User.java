@@ -9,6 +9,7 @@ import lombok.*;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
+import java.nio.file.attribute.UserPrincipal;
 import java.util.Collection;
 import java.util.Date;
 import java.util.List;
@@ -46,6 +47,10 @@ public class User implements UserDetails {
     private Long confirmationOtp = 0L;
 
     private Date confirmationOtpExpiry = new Date();
+
+    private Long passwordResetOtp = 0L;
+
+    private Date passwordResetOtpExpiry = new Date();
 
     private boolean verified = false;
 

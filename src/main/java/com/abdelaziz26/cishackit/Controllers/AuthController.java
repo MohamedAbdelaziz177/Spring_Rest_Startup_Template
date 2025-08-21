@@ -14,6 +14,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Map;
+
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
@@ -30,7 +32,7 @@ public class AuthController {
         TokenResponse tokenResponse = authService.login(loginRequest, response);
         return ResponseEntity.ok(AuthResponseDto.builder()
                         .accessToken(tokenResponse.getAccessToken())
-                        .expirationDate(null)
+                        .expirationDate(tokenResponse.getAccessTokenExpiry())
                         .build());
     }
 
@@ -63,5 +65,19 @@ public class AuthController {
         //logger.info(request.getCode().toString());
         authService.confirmUser(request.getEmail(), request.getCode());
         return ResponseEntity.ok("Email Confirmed");
+    }
+
+    @PostMapping("/forget-password")
+    public ResponseEntity<String> forgetPassword(@RequestBody Map<String, String> request)
+    {
+        authService.forgetPassword(request.get("email"));
+        return ResponseEntity.ok("Password Reset Code Sent");
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<String> resetPassword(@RequestBody ResetPasswordDto request)
+    {
+        authService.resetPassword(request);
+        return ResponseEntity.ok("Password Reset Successfully");
     }
 }

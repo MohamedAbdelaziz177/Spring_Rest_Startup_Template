@@ -1,9 +1,6 @@
 package com.abdelaziz26.cishackit.Services;
 
-import com.abdelaziz26.cishackit.Core.DTOs.Auth.AuthResponseDto;
-import com.abdelaziz26.cishackit.Core.DTOs.Auth.LoginDto;
-import com.abdelaziz26.cishackit.Core.DTOs.Auth.RegisterDto;
-import com.abdelaziz26.cishackit.Core.DTOs.Auth.TokenResponse;
+import com.abdelaziz26.cishackit.Core.DTOs.Auth.*;
 import com.abdelaziz26.cishackit.Core.Entities.Role;
 import com.abdelaziz26.cishackit.Core.Entities.User;
 import com.abdelaziz26.cishackit.Core.Exceptions.GlobalExceptionHandler;
@@ -22,6 +19,7 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationServiceException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -40,6 +38,7 @@ public class AuthServiceImpl implements AuthService {
     private final PasswordEncoder passwordEncoder;
     private final UserRepo userRepository;
     private final RoleRepo roleRepository;
+
     private final static Logger logger = LoggerFactory.getLogger(AuthServiceImpl.class);
 
     @Override
@@ -49,27 +48,28 @@ public class AuthServiceImpl implements AuthService {
                 new UsernamePasswordAuthenticationToken(loginDto.getEmail(), loginDto.getPassword());
 
         Authentication authRes = authenticationManager.authenticate(authToken);
+        SecurityContextHolder.getContext().setAuthentication(authRes);
 
-        UserDetails userDetails = userDetailsService.loadUserByUsername(loginDto.getEmail());
-
-        User user = userRepository.findByEmail(userDetails.getUsername()).orElseThrow(() ->
-                new NoSuchElementException("No such user found"));
-
-        TokenResponse tokens = jwtService.getTokens(user);
+        TokenResponse tokens = jwtService.getTokens(loginDto.getEmail());
         setRefreshTokenInCookie(response, tokens.getRefreshToken());
 
         return TokenResponse.builder()
                 .accessToken(tokens.getAccessToken())
                 .refreshToken(tokens.getRefreshToken())
+                .accessTokenExpiry(tokens.getAccessTokenExpiry())
                 .build();
     }
 
     @Override
     public String register(RegisterDto registerDto) {
+
         Optional<User> user = userRepository.findByEmail(registerDto.getEmail());
 
         if(user.isPresent())
             throw new AuthenticationServiceException("User already exists");
+
+        if(!registerDto.getPassword().equals(registerDto.getConfirmPassword()))
+            throw new AuthenticationServiceException("Passwords do not match");
 
         Role role = roleRepository.findByName("ROLE_USER").orElseThrow();
 
@@ -143,6 +143,39 @@ public class AuthServiceImpl implements AuthService {
         userRepository.save(user);
     }
 
+    public void forgetPassword(String email)
+    {
+        User user = userRepository.findByEmail(email).orElseThrow(() ->
+                new NoSuchElementException("No such user found"));
+
+        Long otp = sendOtpToUser(email);
+
+        user.setPasswordResetOtp(otp);
+        user.setPasswordResetOtpExpiry(new Date(System.currentTimeMillis() + 1000 * 60 * 2));
+
+        userRepository.save(user);
+    }
+
+    public void resetPassword(ResetPasswordDto request)
+    {
+        User user = userRepository.findByEmail(request.getEmail()).orElseThrow(() ->
+                new NoSuchElementException("No such user found"));
+
+        if(!user.getPasswordResetOtp().equals(request.getCode()))
+            throw new AuthenticationServiceException("Invalid OTP");
+
+        if(user.getPasswordResetOtpExpiry().before(new Date()))
+            throw new AuthenticationServiceException("OTP Expired");
+
+        if(!request.getPassword().equals(request.getConfirmPassword()))
+            throw new AuthenticationServiceException("Confirm Password Mismatch");
+
+        user.setPasswordResetOtp(0L);
+        user.setPasswordResetOtpExpiry(new Date());
+        user.setPassword(passwordEncoder.encode(request.getPassword()));
+
+        userRepository.save(user);
+    }
     private Long sendOtpToUser(String email) {
 
         Long otp = new Random().nextLong(100000, 199999);;
@@ -161,7 +194,6 @@ public class AuthServiceImpl implements AuthService {
 
         response.addCookie(cookie);
     }
-
     private String getRefreshTokenFromCookie(HttpServletRequest request)
     {
         for(Cookie cookie : request.getCookies()) {

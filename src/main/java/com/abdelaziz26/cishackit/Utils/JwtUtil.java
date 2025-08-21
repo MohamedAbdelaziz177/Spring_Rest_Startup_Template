@@ -179,6 +179,12 @@ public class JwtUtil {
 
         return tokenResponse;
     }
+
+    public TokenResponse getTokens(String email)
+    {
+        User user = userRepo.findByEmail(email).orElse(null);
+        return getTokens(user);
+    }
     private void killTokensForUser(Long userId) {
 
         refreshTokenRepo.deleteAllByUser_Id(userId);
