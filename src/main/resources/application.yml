@@ -1,0 +1,39 @@
+spring:
+  application:
+   name: CisHackIt
+
+  profiles:
+    active: dev
+
+  datasource:
+    url: ${DB_URL}
+    password: ${DB_PASSWORD}
+    username: ${DB_USER}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    show-sql: true
+    hibernate:
+      ddl-auto: update
+
+  data:
+    jdbc:
+      dialect: mysql
+
+  security:
+    jwt:
+      secret: ${JWT_SEC}
+      expiration: 3600000
+      refresh-token:
+        expiration: 604800000
+
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
